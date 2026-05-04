@@ -1,0 +1,97 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  IMAGE_NAME_FRONTEND: l3-ai-quant-wallet-frontend
+  IMAGE_NAME_BACKEND: l3-ai-quant-wallet-backend
+  IMAGE_NAME_AI: l3-ai-quant-wallet-ai-engine
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        run: echo "sha_short=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ steps.meta.outputs.sha_short }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ steps.meta.outputs.sha_short }}
+
+      - name: Build and push AI engine image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ai-engine
+          file: ./ai-engine/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME_AI }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME_AI }}:${{ steps.meta.outputs.sha_short }}
+
+  deploy:
+    name: Deploy to AWS EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USER }}
+          key: ${{ secrets.AWS_EC2_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.AWS_EC2_USER }}/l3-ai-quant-wallet
+
+            # 拉取最新代码（可选，仅用于获取 docker-compose.prod.yml）
+            git pull origin main || true
+
+            # 登录 Docker Hub
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+            # 拉取最新镜像
+            docker compose -f docker-compose.prod.yml pull
+
+            # 重启服务
+            docker compose -f docker-compose.prod.yml down
+            docker compose -f docker-compose.prod.yml up -d
+
+            # 清理旧镜像
+            docker image prune -f
+
+            echo "✅ Deployment completed successfully!"
