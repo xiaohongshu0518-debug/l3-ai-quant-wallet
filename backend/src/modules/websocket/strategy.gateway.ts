@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @WebSocketGateway({
   namespace: /\/ws\/strategy\/.+/,
@@ -26,7 +26,10 @@ export class StrategyGateway
 
   private userSockets: Map<string, Set<string>> = new Map();
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
@@ -47,11 +50,29 @@ export class StrategyGateway
       }
       this.userSockets.get(walletAddress)!.add(client.id);
 
-      // Join room based on user strategy
+      // Extract strategy ID from namespace and verify ownership
       const namespaceParts = client.nsp.name.split('/');
       const userStrategyId = namespaceParts[namespaceParts.length - 1];
-      client.join(`strategy:${userStrategyId}`);
 
+      // 关键修复：验证策略所有权
+      const user = await this.prisma.user.findUnique({
+        where: { walletAddress },
+      });
+      if (!user) {
+        client.emit('error', { message: 'User not found' });
+        client.disconnect();
+        return;
+      }
+      const userStrategy = await this.prisma.userStrategy.findUnique({
+        where: { id: userStrategyId },
+      });
+      if (!userStrategy || userStrategy.userId !== user.id) {
+        client.emit('error', { message: 'Strategy not found or access denied' });
+        client.disconnect();
+        return;
+      }
+
+      client.join(`strategy:${userStrategyId}`);
       client.emit('connected', {
         message: 'Connected to strategy gateway',
         walletAddress,
@@ -64,7 +85,6 @@ export class StrategyGateway
   }
 
   handleDisconnect(client: Socket) {
-    // Clean up user socket tracking
     for (const [walletAddress, sockets] of this.userSockets.entries()) {
       sockets.delete(client.id);
       if (sockets.size === 0) {
@@ -73,7 +93,6 @@ export class StrategyGateway
     }
   }
 
-  @SubscribeMessage('subscribe_strategy')
   handleSubscribeStrategy(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userStrategyId: string },
@@ -82,7 +101,6 @@ export class StrategyGateway
     return { event: 'subscribed', data: { userStrategyId: data.userStrategyId } };
   }
 
-  @SubscribeMessage('unsubscribe_strategy')
   handleUnsubscribeStrategy(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userStrategyId: string },

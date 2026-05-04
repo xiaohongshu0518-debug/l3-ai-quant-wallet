@@ -15,7 +15,6 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import type { UserStrategy } from '@/types';
 import {
   TrendingUp,
-  Wallet,
   LineChart,
   StopCircle,
   PlayCircle,

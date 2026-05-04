@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ import { ArrowLeft, BarChart3, Play, Loader2, CheckCircle, AlertCircle } from 'l
 export default function StrategyDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [strategy, setStrategy] = useState<any>(null);
+  const [strategy, setStrategy] = useState<Record<string, any> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -30,6 +30,16 @@ export default function StrategyDetailPage() {
   const [amount, setAmount] = useState('1000');
   const [stopLoss, setStopLoss] = useState('5');
   const [takeProfit, setTakeProfit] = useState('15');
+  const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 卸载时清除定时器
+  useEffect(() => {
+    return () => {
+      if (navigateTimerRef.current) {
+        clearTimeout(navigateTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -47,24 +57,40 @@ export default function StrategyDetailPage() {
 
   const handleStartStrategy = async () => {
     if (!strategy) return;
-    setIsStarting(true);
     setStartError(null);
     setStartSuccess(null);
 
+    // 输入验证
+    const amountNum = Number(amount);
+    const stopLossNum = Number(stopLoss);
+    const takeProfitNum = Number(takeProfit);
+    if (!amountNum || amountNum < 10) {
+      setStartError('投入金额不能少于 10 USDT');
+      return;
+    }
+    if (!stopLossNum || stopLossNum < 1 || stopLossNum > 50) {
+      setStartError('止损比例必须在 1-50 之间');
+      return;
+    }
+    if (!takeProfitNum || takeProfitNum < 1 || takeProfitNum > 200) {
+      setStartError('止盈比例必须在 1-200 之间');
+      return;
+    }
+
+    setIsStarting(true);
     try {
       const result = await api.startStrategy({
         strategyId: strategy.id,
         mode: 'exchange',
         parameters: {
           tradingPair,
-          amount: Number(amount),
-          stopLoss: Number(stopLoss),
-          takeProfit: Number(takeProfit),
+          amount: amountNum,
+          stopLoss: stopLossNum,
+          takeProfit: takeProfitNum,
         },
       });
       setStartSuccess(`策略已启动！ID: ${result.userStrategyId.slice(0, 8)}...`);
-      // 3秒后跳转到 Dashboard
-      setTimeout(() => router.push(ROUTES.dashboard), 3000);
+      navigateTimerRef.current = setTimeout(() => router.push(ROUTES.dashboard), 3000);
     } catch (err: any) {
       setStartError(err.message || '启动策略失败');
     } finally {

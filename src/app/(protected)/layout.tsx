@@ -19,10 +19,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   Wallet,
   BarChart3,
-  ChevronDown,
 } from 'lucide-react';
 import { ROUTES } from '@/utils/constants';
 

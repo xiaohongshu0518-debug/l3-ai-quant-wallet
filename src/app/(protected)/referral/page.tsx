@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/services/api';
 import { Users, Copy, Gift, Share2, Check } from 'lucide-react';
+import type { ReferralRecord } from '@/types';
 
 export default function ReferralPage() {
   const [referralInfo, setReferralInfo] = useState<{
@@ -18,7 +19,7 @@ export default function ReferralPage() {
     referralLink: string;
     rewardPerReferral: number;
   } | null>(null);
-  const [records, setRecords] = useState<{ totalReferrals: number; totalEarned: number; referrals: any[] } | null>(null);
+  const [records, setRecords] = useState<{ totalReferrals: number; totalEarned: number; referrals: ReferralRecord[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -139,7 +140,7 @@ export default function ReferralPage() {
               <div key={record.id || i} className="flex items-center justify-between py-2 border-b border-muted last:border-0">
                 <div>
                   <p className="text-sm font-medium">
-                    {record.refereeName || record.refereeAddress?.slice(0, 8) + '...' || '未知用户'}
+                    {record.refereeName || (record.refereeAddress ? record.refereeAddress.slice(0, 8) + '...' : '未知用户')}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     加入时间: {new Date(record.joinedAt).toLocaleDateString()}

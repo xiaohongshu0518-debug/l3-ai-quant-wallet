@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/services/api';
 import { POINT_PACKAGES } from '@/utils/constants';
 import type { PointTransaction, PointBalance } from '@/types';
-import { Coins, History, Sparkles, Loader2 } from 'lucide-react';
+import { Coins, History, Sparkles } from 'lucide-react';
 
 export default function PointsPage() {
   const [balance, setBalance] = useState<PointBalance | null>(null);

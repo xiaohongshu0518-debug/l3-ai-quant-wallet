@@ -15,12 +15,6 @@ export interface User {
   createdAt: string;
 }
 
-export interface WalletLoginRequest {
-  walletAddress: string;
-  signature: string;
-  message: string;
-}
-
 export interface AuthResponse {
   token: string;
   user: User;
@@ -155,8 +149,8 @@ export interface ReferralInfo {
 
 export interface ReferralRecord {
   id: string;
-  refereeName: string;
-  refereeAddress: string;
+  refereeName?: string;
+  refereeAddress?: string;
   reward: number;
   joinedAt: string;
 }

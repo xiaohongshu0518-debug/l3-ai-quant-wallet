@@ -12,17 +12,36 @@ export default function AdminPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuthContext();
 
-  // 权限校验：仅管理员可访问
+  // 权限校验：未登录→登录页，非管理员→Dashboard
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || (user && user.level < 5))) {
+    if (isLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login');
+    } else if (user && user.level < 5) {
       router.push('/dashboard');
     }
   }, [isAuthenticated, isLoading, user, router]);
 
-  if (isLoading || !user || user.level < 5) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <p className="text-muted-foreground">验证权限中...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-muted-foreground">正在跳转到登录页...</p>
+      </div>
+    );
+  }
+
+  if (!user || user.level < 5) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-muted-foreground">正在跳转到仪表盘...</p>
       </div>
     );
   }

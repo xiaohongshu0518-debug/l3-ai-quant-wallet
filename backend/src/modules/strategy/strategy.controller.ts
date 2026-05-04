@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { StrategyService } from './strategy.service';
 import { WalletAuthGuard } from '../auth/wallet-auth.guard';
@@ -22,7 +23,15 @@ export class PublicStrategyController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
   ) {
-    const result = await this.strategyService.getStrategies(Number(page), Number(limit));
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    if (!Number.isInteger(pageNum) || pageNum < 1) {
+      throw new BadRequestException('page must be a positive integer');
+    }
+    if (!Number.isInteger(limitNum) || limitNum < 1 || limitNum > 100) {
+      throw new BadRequestException('limit must be between 1 and 100');
+    }
+    const result = await this.strategyService.getStrategies(pageNum, limitNum);
     return { strategies: result.data, total: result.meta.total };
   }
 
