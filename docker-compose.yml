@@ -1,24 +1,6 @@
 version: '3.8'
 
 services:
-  # ---- PostgreSQL 数据库 ----
-  postgres:
-    image: postgres:16-alpine
-    container_name: aqw-postgres
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: ai_quant_wallet
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   # ---- Redis（缓存 + 消息队列） ----
   redis:
     image: redis:7-alpine
@@ -31,7 +13,7 @@ services:
       timeout: 3s
       retries: 5
 
-  # ---- NestJS 后端 ----
+  # ---- NestJS 后端（SQLite，无需 PostgreSQL） ----
   backend:
     build:
       context: ./backend
@@ -42,7 +24,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_quant_wallet
+      - DATABASE_URL=file:./dev.db
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - JWT_SECRET=${JWT_SECRET:-production-jwt-secret}
@@ -50,8 +32,6 @@ services:
       - FRONTEND_URL=http://localhost:3000
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef}
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -69,6 +49,3 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-
-volumes:
-  pgdata:
