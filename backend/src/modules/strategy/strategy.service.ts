@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BacktestService } from './backtest.service';
 
@@ -66,6 +66,19 @@ export class StrategyService {
       throw new NotFoundException('Strategy not found');
     }
 
+    // Check for duplicate running strategy of the same type
+    const existing = await this.prisma.userStrategy.findFirst({
+      where: {
+        userId: user.id,
+        strategyId: data.strategyId,
+        status: 'RUNNING',
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('This strategy is already running for the user');
+    }
+
     return this.prisma.userStrategy.create({
       data: {
         userId: user.id,
@@ -77,13 +90,25 @@ export class StrategyService {
     });
   }
 
-  async stopStrategy(userStrategyId: string) {
+  async stopStrategy(walletAddress: string, userStrategyId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { walletAddress: walletAddress.toLowerCase() },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
     const userStrategy = await this.prisma.userStrategy.findUnique({
       where: { id: userStrategyId },
     });
 
     if (!userStrategy) {
       throw new NotFoundException('User strategy not found');
+    }
+
+    if (userStrategy.userId !== user.id) {
+      throw new ForbiddenException('You do not own this strategy');
     }
 
     return this.prisma.userStrategy.update({

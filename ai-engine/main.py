@@ -43,6 +43,10 @@ async def lifespan(app: FastAPI):
     yield
 
     subscribe_task.cancel()
+    try:
+        await subscribe_task
+    except asyncio.CancelledError:
+        pass
     if redis_client:
         await redis_client.close()
     logger.info("AI Engine shut down.")
@@ -77,6 +81,10 @@ async def handle_strategy_command(data: dict):
     """Route a strategy command to the engine."""
     if not engine:
         logger.warning("Engine not initialised, ignoring command.")
+        return
+
+    if not isinstance(data, dict):
+        logger.warning("Invalid command data type: %s", type(data).__name__)
         return
 
     action = data.get("action")

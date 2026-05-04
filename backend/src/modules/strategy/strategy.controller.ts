@@ -48,7 +48,7 @@ export class StrategyController {
     @CurrentUser() user: { walletAddress: string },
     @Body('userStrategyId') userStrategyId: string,
   ) {
-    return this.strategyService.stopStrategy(userStrategyId);
+    return this.strategyService.stopStrategy(user.walletAddress, userStrategyId);
   }
 
   @Get('user/strategies')

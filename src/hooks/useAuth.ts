@@ -56,8 +56,6 @@ export function useAuth() {
       localStorage.setItem(STORAGE_KEYS.userData, JSON.stringify(result.user));
 
       return result;
-    } catch (error: any) {
-      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -72,9 +70,10 @@ export function useAuth() {
   }, []);
 
   const refreshUser = useCallback(async () => {
+    if (!user) return;
     try {
       const profile = await api.getUserProfile();
-      const updatedUser = { ...user!, ...profile };
+      const updatedUser = { ...user, ...profile };
       setUser(updatedUser);
       localStorage.setItem(STORAGE_KEYS.userData, JSON.stringify(updatedUser));
     } catch (error) {

@@ -4,7 +4,7 @@
 
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -39,11 +39,12 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading, logout } = useAuthContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 未登录且不在加载中则重定向
-  if (!isAuthenticated && !isLoading) {
-    router.push('/login');
-    return null;
-  }
+  // 未登录则重定向
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
     return (

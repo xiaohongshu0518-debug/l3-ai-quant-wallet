@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,10 +21,11 @@ export default function LoginPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // 已登录则跳转
-  if (isAuthenticated && !authLoading) {
-    router.push(ROUTES.dashboard);
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      router.push(ROUTES.dashboard);
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const handleConnectAndLogin = async () => {
     setError(null);

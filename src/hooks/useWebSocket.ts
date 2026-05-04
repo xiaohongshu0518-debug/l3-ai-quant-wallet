@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { wsService } from '@/services/websocket';
 import type { PnLUpdateMessage, StrategyStatusMessage } from '@/types';
 
@@ -14,11 +14,22 @@ export function useWebSocket(strategyId: string | null) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [pnlUpdate, setPnlUpdate] = useState<PnLUpdateMessage['data'] | null>(null);
   const [statusUpdate, setStatusUpdate] = useState<StrategyStatusMessage['data'] | null>(null);
+  const prevStrategyIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!strategyId) return;
 
-    // 连接
+    // 如果策略 ID 变了，先断开旧连接
+    if (prevStrategyIdRef.current && prevStrategyIdRef.current !== strategyId) {
+      wsService.disconnect();
+      // 重置状态
+      setPnlUpdate(null);
+      setStatusUpdate(null);
+      setConnectionStatus('disconnected');
+    }
+    prevStrategyIdRef.current = strategyId;
+
+    // 连接新策略
     wsService.connect(strategyId);
 
     // 监听状态变化
@@ -42,7 +53,10 @@ export function useWebSocket(strategyId: string | null) {
       unsubStatus();
       unsubPnl();
       unsubStatusMsg();
-      // 不要断开连接，可能还有 others 在监听
+      // 组件卸载时断开连接
+      if (!strategyId) return;
+      wsService.disconnect();
+      prevStrategyIdRef.current = null;
     };
   }, [strategyId]);
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -53,18 +53,18 @@ export class PointsService {
       throw new NotFoundException('User not found');
     }
 
-    // Find the pending purchase transaction
+    // Find the purchase transaction matching the specific txHash
     const pendingTx = await this.prisma.pointTransaction.findFirst({
       where: {
         userId: user.id,
         type: 'PURCHASE',
         status: 'PENDING',
+        txHash,
       },
-      orderBy: { createdAt: 'desc' },
     });
 
     if (!pendingTx) {
-      throw new NotFoundException('No pending purchase found');
+      throw new NotFoundException('No pending purchase found for the given transaction hash');
     }
 
     // Update transaction status and user balance
@@ -101,7 +101,7 @@ export class PointsService {
     }
 
     if (user.pointsBalance < amount) {
-      throw new Error('Insufficient points balance');
+      throw new BadRequestException('Insufficient points balance');
     }
 
     await this.prisma.$transaction([

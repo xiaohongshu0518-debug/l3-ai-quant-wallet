@@ -1,8 +1,56 @@
 // ============================================================
-// AI Quant Wallet - API 请求封装
+// AI Quant Wallet - API 请求封装（类型安全版）
 // ============================================================
 
 import { API_BASE_URL } from '@/utils/constants';
+import type { User, Strategy, UserStrategy, PointBalance, PointTransaction, ReferralInfo, ReferralRecord } from '@/types';
+
+interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+interface StartStrategyResponse {
+  userStrategyId: string;
+  status: string;
+  estimatedPointsPerHour: number;
+  startedAt: string;
+}
+
+interface StopStrategyResponse {
+  status: string;
+  totalPnl: number;
+  totalFees: number;
+  runDuration: string;
+}
+
+interface StrategyDetailResponse extends Strategy {
+  backtestData?: {
+    totalReturn: number;
+    maxDrawdown: number;
+    sharpeRatio: number;
+    winRate: number;
+    totalTrades: number;
+    period: string;
+    monthlyReturns: number[];
+  };
+}
+
+interface PurchaseResponse {
+  txParams: {
+    to: string;
+    data: string;
+    value: string;
+  };
+  expectedCost: {
+    amount: number;
+    token: string;
+  };
+}
+
+interface ConfirmPurchaseResponse {
+  newBalance: number;
+}
 
 class ApiClient {
   private baseUrl: string;
@@ -36,7 +84,6 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      // Token 过期，清除本地存储
       localStorage.removeItem('aqw_auth_token');
       localStorage.removeItem('aqw_user_data');
       if (typeof window !== 'undefined') {
@@ -58,44 +105,54 @@ class ApiClient {
     return this.request(`/auth/challenge?wallet=${walletAddress}`);
   }
 
-  async walletLogin(walletAddress: string, signature: string, message: string) {
-    return this.request<{ token: string; user: any }>('/auth/wallet-login', {
+  async walletLogin(walletAddress: string, signature: string, message: string): Promise<AuthResponse> {
+    return this.request('/auth/wallet-login', {
       method: 'POST',
       body: JSON.stringify({ walletAddress, signature, message }),
     });
   }
 
-  async getUserProfile() {
-    return this.request<{ id: string; walletAddress: string; level: number; totalPnl: number; activeStrategies: number }>(
-      '/user/profile'
-    );
+  async getUserProfile(): Promise<Partial<User>> {
+    return this.request('/user/profile');
   }
 
   // ---- Strategy ----
-  async getStrategies() {
-    return this.request<{ strategies: any[] }>('/strategies');
+  async getStrategies(): Promise<{ strategies: Strategy[] }> {
+    return this.request('/strategies');
   }
 
-  async getStrategyDetail(id: string) {
-    return this.request<{ id: string; name: string; backtestData: any }>(`/strategies/${id}`);
+  async getStrategyDetail(id: string): Promise<StrategyDetailResponse> {
+    return this.request(`/strategies/${id}`);
   }
 
-  async startStrategy(data: any) {
-    return this.request<{ userStrategyId: string; status: string; estimatedPointsPerHour: number; startedAt: string }>(
-      '/strategy/start',
-      { method: 'POST', body: JSON.stringify(data) }
-    );
+  async startStrategy(data: {
+    strategyId: string;
+    mode: 'exchange' | 'chain';
+    exchangeApiKeyId?: string;
+    parameters: {
+      amount: number;
+      tradingPair: string;
+      stopLoss: number;
+      takeProfit: number;
+      gridCount?: number;
+      leverage?: number;
+    };
+  }): Promise<StartStrategyResponse> {
+    return this.request('/strategy/start', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
-  async stopStrategy(userStrategyId: string) {
-    return this.request<{ status: string; totalPnl: number; totalFees: number; runDuration: string }>(
-      '/strategy/stop',
-      { method: 'POST', body: JSON.stringify({ userStrategyId }) }
-    );
+  async stopStrategy(userStrategyId: string): Promise<StopStrategyResponse> {
+    return this.request('/strategy/stop', {
+      method: 'POST',
+      body: JSON.stringify({ userStrategyId }),
+    });
   }
 
-  async getUserStrategies() {
-    return this.request<{ strategies: any[] }>('/user/strategies');
+  async getUserStrategies(): Promise<{ strategies: UserStrategy[] }> {
+    return this.request('/user/strategies');
   }
 
   // ---- API Key ----
@@ -107,44 +164,39 @@ class ApiClient {
   }
 
   async getApiKeys() {
-    return this.request<{ keys: any[] }>('/api-keys');
+    return this.request<{ keys: { id: string; exchange: string; isActive: boolean }[] }>('/api-keys');
   }
 
   // ---- Points ----
-  async getPointBalance() {
-    return this.request<{ balance: number; totalConsumed: number; totalPurchased: number }>('/points/balance');
+  async getPointBalance(): Promise<PointBalance> {
+    return this.request('/points/balance');
   }
 
-  async purchasePoints(amount: number, paymentToken: string) {
-    return this.request<{ txParams: any; expectedCost: { amount: number; token: string } }>(
-      '/points/purchase',
-      { method: 'POST', body: JSON.stringify({ amount, paymentToken }) }
-    );
+  async purchasePoints(amount: number, paymentToken: string): Promise<PurchaseResponse> {
+    return this.request('/points/purchase', {
+      method: 'POST',
+      body: JSON.stringify({ amount, paymentToken }),
+    });
   }
 
-  async confirmPurchase(txHash: string) {
-    return this.request<{ newBalance: number }>('/points/purchase/confirm', {
+  async confirmPurchase(txHash: string): Promise<ConfirmPurchaseResponse> {
+    return this.request('/points/purchase/confirm', {
       method: 'POST',
       body: JSON.stringify({ txHash }),
     });
   }
 
-  async getPointTransactions(page = 1, limit = 20) {
-    return this.request<{ transactions: any[]; total: number }>(
-      `/points/transactions?page=${page}&limit=${limit}`
-    );
+  async getPointTransactions(page = 1, limit = 20): Promise<{ transactions: PointTransaction[]; total: number }> {
+    return this.request(`/points/transactions?page=${page}&limit=${limit}`);
   }
 
   // ---- Referral ----
-  async generateReferralLink() {
-    return this.request<{ referralCode: string; referralLink: string; rewardPerReferral: number }>(
-      '/referral/generate',
-      { method: 'POST' }
-    );
+  async generateReferralLink(): Promise<ReferralInfo> {
+    return this.request('/referral/generate', { method: 'POST' });
   }
 
-  async getReferralRecords() {
-    return this.request<{ totalReferrals: number; totalEarned: number; referrals: any[] }>('/referral/records');
+  async getReferralRecords(): Promise<{ totalReferrals: number; totalEarned: number; referrals: ReferralRecord[] }> {
+    return this.request('/referral/records');
   }
 }
 

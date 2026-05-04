@@ -1,25 +1,41 @@
-// ============================================================
-// Admin Page - 管理后台
-// ============================================================
-
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { Shield, Users, LineChart, AlertTriangle, Settings, Activity } from 'lucide-react';
 
 export default function AdminPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading } = useAuthContext();
+
+  // 权限校验：仅管理员可访问
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || (user && user.level < 5))) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, user, router]);
+
+  if (isLoading || !user || user.level < 5) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-muted-foreground">验证权限中...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold">管理后台</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          平台管理与监控
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">管理后台</h1>
+          <p className="text-muted-foreground text-sm mt-1">平台管理与监控（管理员专用）</p>
+        </div>
       </div>
 
-      {/* Overview */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="p-4 border-muted">
           <div className="flex items-center gap-3">
@@ -59,7 +75,6 @@ export default function AdminPage() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <Card className="p-6 border-muted">
         <h2 className="font-semibold mb-4 flex items-center gap-2">
           <Settings className="h-4 w-4 text-purple-400" /> 快捷操作
@@ -73,7 +88,6 @@ export default function AdminPage() {
         </div>
       </Card>
 
-      {/* Recent Activity */}
       <Card className="p-6 border-muted">
         <h2 className="font-semibold mb-4">最近活动</h2>
         <div className="space-y-2 text-sm">
@@ -92,13 +106,12 @@ export default function AdminPage() {
         </div>
       </Card>
 
-      {/* Risk Alert */}
       <Card className="p-4 border-yellow-500/20 bg-yellow-500/5">
         <div className="flex items-start gap-3">
           <Shield className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-medium mb-1">风控状态: 正常</p>
-            <p className="text-muted-foreground">所有系统运行正常，无异常策略触发。上次检查: 1 分钟前。</p>
+            <p className="text-muted-foreground">所有系统运行正常，无异常策略触发。</p>
           </div>
         </div>
       </Card>

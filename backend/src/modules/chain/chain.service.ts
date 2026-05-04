@@ -55,11 +55,12 @@ export class ChainService {
   async verifyTransaction(txHash: string) {
     const provider = this.getProvider(1); // Default to mainnet
     const tx = await provider.getTransaction(txHash);
-    const receipt = await provider.getTransactionReceipt(txHash);
 
     if (!tx) {
       return { verified: false, message: 'Transaction not found' };
     }
+
+    const receipt = await provider.getTransactionReceipt(txHash);
 
     return {
       verified: true,

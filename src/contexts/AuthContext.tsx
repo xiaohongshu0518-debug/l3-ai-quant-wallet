@@ -67,9 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async () => {
+    if (!user) return;
     try {
       const profile = await api.getUserProfile();
-      const updated = { ...user!, ...profile };
+      const updated = { ...user, ...profile };
       setUser(updated);
       localStorage.setItem(STORAGE_KEYS.userData, JSON.stringify(updated));
     } catch {
