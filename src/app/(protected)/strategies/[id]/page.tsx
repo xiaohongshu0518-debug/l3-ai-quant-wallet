@@ -1,5 +1,5 @@
 // ============================================================
-// Strategy Detail - 策略详情页
+// Strategy Detail - 策略详情页（含启停交互）
 // ============================================================
 
 'use client';
@@ -14,13 +14,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/services/api';
 import { STRATEGY_TYPES, RISK_LEVELS, ROUTES } from '@/utils/constants';
-import { ArrowLeft, BarChart3, Play } from 'lucide-react';
+import { ArrowLeft, BarChart3, Play, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function StrategyDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [strategy, setStrategy] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [startSuccess, setStartSuccess] = useState<string | null>(null);
+
+  // 表单状态
+  const [tradingPair, setTradingPair] = useState('ETH/USDT');
+  const [amount, setAmount] = useState('1000');
+  const [stopLoss, setStopLoss] = useState('5');
+  const [takeProfit, setTakeProfit] = useState('15');
 
   useEffect(() => {
     const load = async () => {
@@ -35,6 +44,33 @@ export default function StrategyDetailPage() {
     };
     load();
   }, [params.id]);
+
+  const handleStartStrategy = async () => {
+    if (!strategy) return;
+    setIsStarting(true);
+    setStartError(null);
+    setStartSuccess(null);
+
+    try {
+      const result = await api.startStrategy({
+        strategyId: strategy.id,
+        mode: 'exchange',
+        parameters: {
+          tradingPair,
+          amount: Number(amount),
+          stopLoss: Number(stopLoss),
+          takeProfit: Number(takeProfit),
+        },
+      });
+      setStartSuccess(`策略已启动！ID: ${result.userStrategyId.slice(0, 8)}...`);
+      // 3秒后跳转到 Dashboard
+      setTimeout(() => router.push(ROUTES.dashboard), 3000);
+    } catch (err: any) {
+      setStartError(err.message || '启动策略失败');
+    } finally {
+      setIsStarting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -77,14 +113,37 @@ export default function StrategyDetailPage() {
           <p className="text-muted-foreground mt-1">{typeInfo?.description}</p>
           <div className="flex gap-2 mt-3">
             <Badge variant="outline" className={riskInfo?.color}>{riskInfo?.label}</Badge>
-            <Badge variant="outline">最低 {strategy.minInvestment || 100} USDT</Badge>
-            <Badge variant="outline">{strategy.pointsPerHour || 10} 点/小时</Badge>
+            <Badge variant="outline">最低 {strategy.minCapital || 100} USDT</Badge>
           </div>
         </div>
-        <Button className="bg-gradient-to-r from-purple-600 to-blue-600">
-          <Play className="h-4 w-4 mr-1" /> 启动策略
+        <Button
+          className="bg-gradient-to-r from-purple-600 to-blue-600"
+          onClick={handleStartStrategy}
+          disabled={isStarting || !!startSuccess}
+        >
+          {isStarting ? (
+            <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> 启动中...</>
+          ) : startSuccess ? (
+            <><CheckCircle className="h-4 w-4 mr-1" /> 已启动</>
+          ) : (
+            <><Play className="h-4 w-4 mr-1" /> 启动策略</>
+          )}
         </Button>
       </div>
+
+      {/* Success/Error Messages */}
+      {startSuccess && (
+        <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 flex items-center gap-2">
+          <CheckCircle className="h-4 w-4 shrink-0" />
+          {startSuccess}
+        </div>
+      )}
+      {startError && (
+        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {startError}
+        </div>
+      )}
 
       {/* Backtest Data */}
       {strategy.backtestData && (
@@ -126,9 +185,9 @@ export default function StrategyDetailPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium mb-1 block">交易对</label>
-            <Select defaultValue="ETH/USDT">
+            <Select value={tradingPair} onValueChange={(val) => val && setTradingPair(val)}>
               <SelectTrigger>
-                <SelectValue placeholder="选择交易对" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ETH/USDT">ETH/USDT</SelectItem>
@@ -139,15 +198,35 @@ export default function StrategyDetailPage() {
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">投入金额 (USDT)</label>
-            <Input type="number" placeholder="1000" defaultValue={1000} />
+            <Input
+              type="number"
+              placeholder="1000"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              min={100}
+            />
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">止损比例 (%)</label>
-            <Input type="number" placeholder="5" defaultValue={5} />
+            <Input
+              type="number"
+              placeholder="5"
+              value={stopLoss}
+              onChange={(e) => setStopLoss(e.target.value)}
+              min={1}
+              max={50}
+            />
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">止盈比例 (%)</label>
-            <Input type="number" placeholder="15" defaultValue={15} />
+            <Input
+              type="number"
+              placeholder="15"
+              value={takeProfit}
+              onChange={(e) => setTakeProfit(e.target.value)}
+              min={1}
+              max={200}
+            />
           </div>
         </div>
 

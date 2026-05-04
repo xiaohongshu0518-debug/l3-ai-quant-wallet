@@ -58,7 +58,7 @@ export interface BacktestData {
 
 // ---- 用户策略运行 ----
 export type StrategyMode = 'exchange' | 'chain';
-export type StrategyStatus = 'running' | 'paused' | 'stopped' | 'error';
+export type StrategyStatus = 'RUNNING' | 'STOPPED' | 'PAUSED' | 'ERROR';
 
 export interface StrategyConfigParams {
   amount: number;
@@ -81,16 +81,19 @@ export interface UserStrategy {
   id: string;
   userId: string;
   strategyId: string;
-  mode: StrategyMode;
-  exchangeApiKeyId: string | null;
-  chainStrategyContract: string | null;
-  parameters: StrategyConfigParams;
+  name?: string;
+  mode?: StrategyMode;
+  exchangeApiKeyId?: string | null;
+  chainStrategyContract?: string | null;
+  parameters?: StrategyConfigParams;
+  config?: string | null;
   status: StrategyStatus;
-  totalPnl: number;
-  totalFees: number;
-  startedAt: string;
-  stoppedAt: string | null;
-  strategy: Strategy;
+  totalPnl?: number;
+  totalFees?: number;
+  startedAt?: string;
+  stoppedAt?: string | null;
+  strategy?: Strategy;
+  tradeLogs?: TradeLog[];
 }
 
 // ---- 交易所 API Key ----
@@ -135,12 +138,11 @@ export interface PointBalance {
 
 export interface PointTransaction {
   id: string;
-  type: 'purchase' | 'consume' | 'reward' | 'refund';
+  type: string;
   amount: number;
-  balanceBefore: number;
-  balanceAfter: number;
-  reason: string;
-  txHash: string | null;
+  status: string;
+  description?: string;
+  txHash?: string | null;
   createdAt: string;
 }
 

@@ -1,10 +1,10 @@
 // ============================================================
-// Dashboard - 用户主面板
+// Dashboard - 用户主面板（真实 API 版）
 // ============================================================
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/services/api';
 import { useAuthContext } from '@/contexts/AuthContext';
+import type { UserStrategy } from '@/types';
 import {
   TrendingUp,
   Wallet,
@@ -19,46 +20,58 @@ import {
   StopCircle,
   PlayCircle,
   AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user } = useAuthContext();
-  const [activeStrategies, setActiveStrategies] = useState<any[]>([]);
+  const [strategies, setStrategies] = useState<UserStrategy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
+
+  const loadStrategies = useCallback(async () => {
+    try {
+      const result = await api.getUserStrategies();
+      setStrategies(result.strategies || []);
+    } catch (err) {
+      console.error('加载策略失败:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const result = await api.getUserStrategies();
-        setActiveStrategies(result.strategies || []);
-      } catch (err) {
-        console.error('加载策略失败:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
-  }, []);
+    loadStrategies();
+  }, [loadStrategies]);
+
+  // 计算总收益
+  const totalPnl = strategies.reduce((sum, s) => sum + (s.totalPnl || 0), 0);
+  const runningStrategies = strategies.filter((s) => s.status === 'RUNNING');
+
+  const handleStop = async (userStrategyId: string) => {
+    setStoppingId(userStrategyId);
+    try {
+      await api.stopStrategy(userStrategyId);
+      await loadStrategies();
+    } catch (err: any) {
+      alert(err.message || '停止策略失败');
+    } finally {
+      setStoppingId(null);
+    }
+  };
 
   const statsCards = [
     {
-      title: '总资产',
-      value: '$12,345.00',
-      change: '+11.1%',
-      trend: 'up' as const,
-      icon: Wallet,
-    },
-    {
       title: '总收益',
-      value: '+$1,234.56',
-      change: '+11.1%',
-      trend: 'up' as const,
+      value: totalPnl >= 0 ? `+$${totalPnl.toFixed(2)}` : `-$${Math.abs(totalPnl).toFixed(2)}`,
+      change: `${strategies.length} 个策略`,
+      trend: totalPnl >= 0 ? 'up' as const : 'neutral' as const,
       icon: TrendingUp,
     },
     {
       title: '进行中策略',
-      value: String(activeStrategies.filter((s: any) => s.status === 'running').length),
-      change: `${activeStrategies.length} 个总策略`,
+      value: String(runningStrategies.length),
+      change: `${strategies.length} 个总策略`,
       trend: 'neutral' as const,
       icon: LineChart,
     },
@@ -68,16 +81,14 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Welcome */}
       <div>
-        <h1 className="text-2xl font-bold">
-          欢迎回来
-        </h1>
+        <h1 className="text-2xl font-bold">欢迎回来</h1>
         <p className="text-muted-foreground text-sm">
           {user?.walletAddress?.slice(0, 6)}...{user?.walletAddress?.slice(-4)}
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {statsCards.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -85,11 +96,11 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.title}</p>
-                  <p className="text-2xl font-bold mt-1">{stat.value}</p>
-                  <p className={`text-sm mt-1 flex items-center gap-1 ${
-                    stat.trend === 'up' ? 'text-green-500' : 'text-muted-foreground'
-                  }`}>
-                    {stat.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                  <p className={`text-2xl font-bold mt-1 ${totalPnl >= 0 ? '' : 'text-red-500'}`}>
+                    {stat.value}
+                  </p>
+                  <p className="text-sm mt-1 flex items-center gap-1 text-muted-foreground">
+                    {stat.trend === 'up' && <TrendingUp className="h-3 w-3 text-green-500" />}
                     {stat.change}
                   </p>
                 </div>
@@ -104,17 +115,17 @@ export default function DashboardPage() {
 
       {/* Active Strategies */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">进行中的策略</h2>
+        <h2 className="text-lg font-semibold mb-4">我的策略</h2>
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2].map((i) => (
               <Skeleton key={i} className="h-24 w-full rounded-lg" />
             ))}
           </div>
-        ) : activeStrategies.length === 0 ? (
+        ) : strategies.length === 0 ? (
           <Card className="p-8 text-center border-dashed">
             <LineChart className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground mb-1">暂无运行中的策略</p>
+            <p className="text-muted-foreground mb-1">暂无策略</p>
             <p className="text-sm text-muted-foreground/70 mb-4">
               前往策略市场选择一个 AI 策略开始交易
             </p>
@@ -124,44 +135,54 @@ export default function DashboardPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {activeStrategies.map((strategy: any) => (
-              <Card key={strategy.id} className="p-5 border-muted">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold">{strategy.strategy?.name || '策略'}</h3>
-                      <Badge variant={strategy.status === 'running' ? 'default' : 'secondary'} className="text-[10px]">
-                        {strategy.status === 'running' ? '运行中' : strategy.status}
-                      </Badge>
+            {strategies.map((strategy) => {
+              const isRunning = strategy.status === 'RUNNING';
+              const isStopping = stoppingId === strategy.id;
+              return (
+                <Card key={strategy.id} className="p-5 border-muted">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold">{strategy.name}</h3>
+                        <Badge
+                          variant={isRunning ? 'default' : 'secondary'}
+                          className={`text-[10px] ${isRunning ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}`}
+                        >
+                          {isRunning ? '运行中' : strategy.status === 'STOPPED' ? '已停止' : strategy.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {strategy.config
+                          ? (() => { try { const c = JSON.parse(strategy.config); return c.tradingPair || 'ETH/USDT'; } catch { return 'ETH/USDT'; } })()
+                          : 'ETH/USDT'}
+                      </p>
+                      <div className="flex items-center gap-4 mt-2 text-sm">
+                        <span className="text-muted-foreground">
+                          已运行: {strategy.startedAt
+                            ? Math.floor((Date.now() - new Date(strategy.startedAt).getTime()) / 3600000) + 'h'
+                            : '刚启动'}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {strategy.parameters?.tradingPair || 'ETH/USDT'}
-                      {' | '}
-                      {strategy.mode === 'exchange' ? '交易所模式' : '链上模式'}
-                    </p>
-                    <div className="flex items-center gap-4 mt-2 text-sm">
-                      <span className={strategy.totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                        收益: {strategy.totalPnl >= 0 ? '+' : ''}{strategy.totalPnl?.toFixed(2) || '0.00'} USDT
-                      </span>
-                      <span className="text-muted-foreground">
-                        已运行: {strategy.startedAt ? Math.floor((Date.now() - new Date(strategy.startedAt).getTime()) / 3600000) + 'h' : '刚启动'}
-                      </span>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={isStopping || !isRunning}
+                      onClick={() => isRunning && handleStop(strategy.id)}
+                      className={isRunning ? 'text-destructive hover:text-destructive' : ''}
+                    >
+                      {isStopping ? (
+                        <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> 停止中</>
+                      ) : isRunning ? (
+                        <><StopCircle className="h-4 w-4 mr-1" /> 停止</>
+                      ) : (
+                        <><PlayCircle className="h-4 w-4 mr-1 text-muted-foreground" /> 已停止</>
+                      )}
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={strategy.status === 'running' ? 'text-destructive hover:text-destructive' : ''}
-                  >
-                    {strategy.status === 'running' ? (
-                      <><StopCircle className="h-4 w-4 mr-1" /> 停止</>
-                    ) : (
-                      <><PlayCircle className="h-4 w-4 mr-1" /> 启动</>
-                    )}
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

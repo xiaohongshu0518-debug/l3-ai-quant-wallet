@@ -8,6 +8,7 @@ import { ReactNode, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -38,6 +39,16 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout } = useAuthContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pointBalance, setPointBalance] = useState<number | null>(null);
+
+  // 获取点卡余额
+  useEffect(() => {
+    if (isAuthenticated) {
+      api.getPointBalance()
+        .then((data) => setPointBalance(data.balance))
+        .catch(() => setPointBalance(null));
+    }
+  }, [isAuthenticated]);
 
   // 未登录则重定向
   useEffect(() => {
@@ -153,7 +164,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="gap-1 py-1.5">
               <Coins className="h-3 w-3" />
-              <span>0 点</span>
+              <span>{pointBalance !== null ? `${pointBalance} 点` : '— 点'}</span>
             </Badge>
             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white text-xs font-bold">
               {user?.walletAddress?.slice(2, 4).toUpperCase()}
