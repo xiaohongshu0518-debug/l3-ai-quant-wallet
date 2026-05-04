@@ -85,7 +85,7 @@ export class StrategyService {
         strategyId: data.strategyId,
         name: data.name || strategy.name,
         status: 'RUNNING',
-        config: data.config || {},
+        config: data.config ? JSON.stringify(data.config) : '{}',
       },
     });
   }
