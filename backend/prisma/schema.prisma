@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// User
+// ============================================================
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique
+  nickname      String?
+  avatar        String?
+  pointsBalance Int      @default(0)
+  referralCode  String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userApiKeys      UserApiKey[]
+  userStrategies   UserStrategy[]
+  pointTransactions PointTransaction[]
+  referralRelations ReferralRelation[] @relation("Referrer")
+  referredBy       ReferralRelation[] @relation("Referee")
+}
+
+// ============================================================
+// User API Keys for Exchanges
+// ============================================================
+model UserApiKey {
+  id        String   @id @default(uuid())
+  userId    String
+  exchange  String   // binance | okx
+  apiKey    String
+  apiSecret String   // encrypted
+  label     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, exchange, apiKey])
+  @@map("user_api_keys")
+}
+
+// ============================================================
+// Strategy Definitions (system-defined strategies)
+// ============================================================
+model Strategy {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  type        String   // grid | martingale | arbitrage | ai
+  configSchema Json?   // JSON schema for strategy configuration
+  minCapital  Float?
+  maxCapital  Float?
+  riskLevel   String?  // low | medium | high
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userStrategies UserStrategy[]
+}
+
+// ============================================================
+// User Strategy Instances
+// ============================================================
+model UserStrategy {
+  id         String   @id @default(uuid())
+  userId     String
+  strategyId String
+  name       String
+  status     String   // RUNNING | STOPPED | PAUSED | ERROR
+  config     Json?
+  startedAt  DateTime?
+  stoppedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  tradeLogs TradeLog[]
+  pnlSnapshots PnLSnapshot[]
+
+  @@map("user_strategies")
+}
+
+// ============================================================
+// Trade Logs
+// ============================================================
+model TradeLog {
+  id             String   @id @default(uuid())
+  userStrategyId String
+  exchange       String   @default("binance")
+  symbol         String
+  side           String   // BUY | SELL
+  type           String   // MARKET | LIMIT
+  quantity       Float
+  price          Float
+  fee            Float?
+  feeCurrency    String?
+  profit         Float?
+  externalOrderId String?
+  status         String   // FILLED | PARTIAL | CANCELLED
+  executedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  userStrategy UserStrategy @relation(fields: [userStrategyId], references: [id], onDelete: Cascade)
+
+  @@map("trade_logs")
+}
+
+// ============================================================
+// PnL Snapshots
+// ============================================================
+model PnLSnapshot {
+  id             String   @id @default(uuid())
+  userStrategyId String
+  pnl            Float
+  pnlPercent     Float
+  totalInvested  Float
+  currentValue   Float
+  snapshotAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  userStrategy UserStrategy @relation(fields: [userStrategyId], references: [id], onDelete: Cascade)
+
+  @@map("pnl_snapshots")
+}
+
+// ============================================================
+// Point Transactions
+// ============================================================
+model PointTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // PURCHASE | CONSUMPTION | REFERRAL_REWARD | SYSTEM
+  amount      Int      // positive for credit, negative for debit
+  status      String   // PENDING | COMPLETED | FAILED
+  txHash      String?
+  paymentToken String?
+  strategyId  String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("point_transactions")
+}
+
+// ============================================================
+// Referral Relations
+// ============================================================
+model ReferralRelation {
+  id         String   @id @default(uuid())
+  referrerId String
+  refereeId  String   @unique
+  reward     Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  referrer User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee  User @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
+
+  @@map("referral_relations")
+}
